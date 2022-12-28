@@ -1,7 +1,7 @@
 import time, network, socket, sys, json
-import settings
 from machine import Pin
 import onewire, ds18x20
+from wifi import connectWIFI
 
 UTF_8: str = 'utf-8'
 
@@ -22,18 +22,6 @@ def readTemperatures(ds) -> dict[str, float]:
     temps[romString] = ds.read_temp(rom)
   return temps
 
-def connectWIFI():
-  station = network.WLAN(network.STA_IF)
-  station.active(True)
-  # station.ifconfig((settings.WIFI_IP, settings.WIFI_MASK, settings.WIFI_GW, settings.WIFI_DNS))
-  station.connect(settings.WIFI_NAME, settings.WIFI_PASS)
-  while station.isconnected() == False:
-    time.sleep_ms(100)
-    print("Waiting for WIFI connection....")
-  print('Connected to WIFI: %s' % station.isconnected())
-  print('IP config: %s' % str(station.ifconfig()))
-  return station
-
 def initAPIServer() -> socket:
   s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   s.bind(('', 80))
@@ -45,7 +33,6 @@ def sendResponse(conn, httpStatusString: str, contentType: str, body: str):
   conn.send(bytes('Content-Type: %s\n' % contentType, UTF_8))
   conn.send(b'Connection: close\n\n')
   conn.sendall(bytes(body, UTF_8))
-
 
 def handleConnections(socketServer: socket, ds):
   while True:
@@ -74,13 +61,13 @@ def handleConnections(socketServer: socket, ds):
 
 def main():
   ds = initTemperature()
-  station = connectWIFI()
+  station = network.WLAN(network.STA_IF)
   socketServer: socket = initAPIServer()
   while True:
     try:
       if station.isconnected() == False:
         station = connectWIFI()
-        socketServer: socket = initAPIServer()
+        socketServer = initAPIServer()
       handleConnections(socketServer, ds)
     except Exception as e:
       sys.print_exception(e)
